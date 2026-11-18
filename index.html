@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Multi-Agent RAG Knowledge Vault</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 p-2 rounded-lg font-bold text-white">AI</div>
+            <div>
+                <h1 class="font-bold text-lg">Enterprise Knowledge Vault</h1>
+                <p class="text-xs text-slate-400">Multi-Agent RAG & Validation System</p>
+            </div>
+        </div>
+        <div class="flex space-x-2 bg-slate-800 p-1 rounded-lg">
+            <button onclick="switchTab('chat')" id="btn-chat" class="px-4 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white transition">Ask Vault</button>
+            <button onclick="switchTab('ingest')" id="btn-ingest" class="px-4 py-1.5 text-sm font-medium rounded-md text-slate-400 hover:text-white transition">Ingest Documents</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-6 flex flex-col">
+        
+        <!-- TAB 1: CHAT INTERFACE -->
+        <div id="tab-chat" class="flex-1 flex flex-col space-y-6">
+            <div id="chat-container" class="flex-1 space-y-4 overflow-y-auto max-h-[500px] p-4 bg-slate-900/40 rounded-xl border border-slate-800/80">
+                <div class="flex items-start space-x-3">
+                    <div class="bg-indigo-600 text-xs px-2.5 py-1 rounded-full font-semibold">System</div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-sm max-w-2xl leading-relaxed">
+                        Hello! I am your Enterprise Multi-Agent RAG assistant. Ask me questions about company policies, HR guidelines, or ingested documents.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query Input -->
+            <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center space-x-3">
+                <input type="text" id="query-input" placeholder="Ask a question (e.g., What is our annual paid leave policy?)..." class="flex-1 bg-transparent border-none outline-none px-3 text-slate-100 placeholder-slate-500 text-sm" onkeypress="if(event.key === 'Enter') sendQuery()">
+                <button onclick="sendQuery()" id="send-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition flex items-center space-x-2">
+                    <span>Send Query</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 2: INGESTION INTERFACE -->
+        <div id="tab-ingest" class="hidden flex-1 flex flex-col space-y-6">
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-xl space-y-4">
+                <h2 class="text-lg font-semibold">Ingest New Enterprise Document</h2>
+                <p class="text-xs text-slate-400">Add plain text documents and source names to update the vector knowledge base instantly.</p>
+                
+                <div class="space-y-2">
+                    <label class="text-xs font-medium text-slate-300">Document Text Content</label>
+                    <textarea id="ingest-text" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500" placeholder="Paste company policy or guideline text here..."></textarea>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-medium text-slate-300">Source Name / Filename</label>
+                    <input type="text" id="ingest-source" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500" placeholder="e.g., HR_Policy_2026.txt">
+                </div>
+
+                <button onclick="ingestDocument()" id="ingest-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">
+                    Ingest into Vector Vault
+                </button>
+                <div id="ingest-status" class="text-xs font-medium"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function switchTab(tab) {
+            const chatTab = document.getElementById('tab-chat');
+            const ingestTab = document.getElementById('tab-ingest');
+            const btnChat = document.getElementById('btn-chat');
+            const btnIngest = document.getElementById('btn-ingest');
+
+            if (tab === 'chat') {
+                chatTab.classList.remove('hidden');
+                ingestTab.classList.add('hidden');
+                btnChat.className = "px-4 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white transition";
+                btnIngest.className = "px-4 py-1.5 text-sm font-medium rounded-md text-slate-400 hover:text-white transition";
+            } else {
+                ingestTab.classList.remove('hidden');
+                chatTab.classList.add('hidden');
+                btnIngest.className = "px-4 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white transition";
+                btnChat.className = "px-4 py-1.5 text-sm font-medium rounded-md text-slate-400 hover:text-white transition";
+            }
+        }
+
+        async function sendQuery() {
+            const input = document.getElementById('query-input');
+            const container = document.getElementById('chat-container');
+            const query = input.value.trim();
+            if (!query) return;
+
+            // Append user message
+            container.innerHTML += `
+                <div class="flex items-start justify-end space-x-3">
+                    <div class="bg-indigo-600/20 border border-indigo-500/30 p-4 rounded-xl text-sm max-w-2xl leading-relaxed">
+                        ${query}
+                    </div>
+                    <div class="bg-slate-700 text-xs px-2.5 py-1 rounded-full font-semibold">You</div>
+                </div>
+            `;
+            input.value = '';
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await response.json();
+
+                let chunksHtml = '';
+                if (data.retrieved_chunks && data.retrieved_chunks.length > 0) {
+                    chunksHtml = `<div class="mt-3 pt-3 border-t border-slate-800 text-xs space-y-1 text-slate-400">
+                        <span class="font-semibold text-slate-300">Retrieved Chunks (${data.retrieved_chunks.length}):</span>
+                        ${data.retrieved_chunks.map(c => `<div class="bg-slate-950 p-2 rounded border border-slate-800">📄 <b>${c.source}</b> (Score: ${c.relevance_score}):${c.content}</div>`).join('')}
+                    </div>`;
+                }
+
+                container.innerHTML += `
+                    <div class="flex items-start space-x-3">
+                        <div class="bg-indigo-600 text-xs px-2.5 py-1 rounded-full font-semibold">Agent</div>
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl text-sm max-w-2xl leading-relaxed space-y-2">
+                            <div class="flex space-x-2">
+                                <span class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] px-2 py-0.5 rounded font-mono">Route: ${data.route_taken}</span>
+                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] px-2 py-0.5 rounded font-mono">Confidence: ${data.confidence}</span>
+                            </div>
+                            <p class="text-slate-200">${data.validated_answer}</p>
+                            ${chunksHtml}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML += `<div class="text-red-400 text-xs">Error connecting to backend API.</div>`;
+            }
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function ingestDocument() {
+            const text = document.getElementById('ingest-text').value.trim();
+            const source = document.getElementById('ingest-source').value.trim();
+            const statusDiv = document.getElementById('ingest-status');
+
+            if (!text || !source) {
+                statusDiv.className = "text-xs font-medium text-red-400";
+                statusDiv.innerText = "Please provide both text content and a source name.";
+                return;
+            }
+            try {
+                const response = await fetch('http://127.0.0.1:8000/ingest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ documents: [text], sources: [source] })
+                });
+                const data = await response.json();
+                statusDiv.className = "text-xs font-medium text-emerald-400";
+                statusDiv.innerText = `Success! Indexed ${data.chunks_indexed} document chunks into ChromaDB.`;
+                document.getElementById('ingest-text').value = '';
+                document.getElementById('ingest-source').value = '';
+            } catch (err) {
+                statusDiv.className = "text-xs font-medium text-red-400";
+                statusDiv.innerText = "Error ingesting document.";
+            }
+        }
+    </script>
+</body>
+</html>

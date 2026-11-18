@@ -1,0 +1,13 @@
+# Python & Virtual Environment
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.vscode/
+
+# Vector Database Local Storage
+chroma_db/
+
+# Environment Variables & Logs
+.env
+*.log
