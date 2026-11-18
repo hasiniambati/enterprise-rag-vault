@@ -5,52 +5,45 @@ from langchain_community.vectorstores import Chroma
 
 DB_DIRECTORY = "./chroma_db"
 
-# Page Configuration & Custom Dark Theme Styling
 st.set_page_config(
     page_title="Enterprise Knowledge Vault",
     page_icon="🤖",
     layout="centered"
 )
 
+# Custom Dark Theme CSS matching your Tailwind aesthetic
 st.markdown("""
 <style>
-    /* Global Dark Theme */
     .stApp {
         background-color: #020617;
         color: #f1f5f9;
     }
-    /* Sidebar styling */
     [data-testid="stSidebar"] {
         background-color: #090d16;
         border-right: 1px solid #1e293b;
     }
-    /* Input fields styling */
     .stTextInput input, .stTextArea textarea {
         background-color: #0f172a !important;
         color: #f1f5f9 !important;
         border: 1px solid #1e293b !important;
         border-radius: 0.5rem !important;
     }
-    /* Buttons styling */
     .stButton button {
         background-color: #4f46e5 !important;
         color: white !important;
         border-radius: 0.5rem !important;
         font-weight: 500;
         border: none;
-        padding: 0.5rem 1rem;
     }
     .stButton button:hover {
         background-color: #4338ca !important;
     }
-    /* Headers */
     h1, h2, h3, h4 {
         color: #f1f5f9 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize Chroma and Embeddings
 @st.cache_resource
 def get_vectorstore():
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -75,7 +68,6 @@ def similarity_search(query, k=2):
         })
     return formatted
 
-# Agent Logic
 class AgentRouter:
     @staticmethod
     def route_query(query):
@@ -91,61 +83,103 @@ class ValidatorAgent:
     @staticmethod
     def validate_response(chunks, query):
         if not chunks:
-            return {"validated_answer": "I could not find verified enterprise documentation supporting this query.", "confidence": "Low (No relevant chunks found)"}
+            return {
+                "validated_answer": "I could not find verified enterprise documentation supporting this query.",
+                "confidence": "Low (No relevant chunks found)"
+            }
         top_score = chunks[0]["relevance_score"]
         if top_score > 1.5:
-            return {"validated_answer": "Low relevance match. Please consult internal department leads directly.", "confidence": "Medium-Low"}
+            return {
+                "validated_answer": "Low relevance match. Please consult internal department leads directly.",
+                "confidence": "Medium-Low"
+            }
         context = "\n".join([c["content"] for c in chunks])
-        return {"validated_answer": f"Based on verified internal records:\n\n{context}", "confidence": "High (Verified against source chunks)"}
-
-# UI Header
-col_logo, col_title = st.columns([0.15, 0.85])
-with col_logo:
-    st.markdown("### 🤖")
-with col_title:
-    st.markdown("### Enterprise Knowledge Vault")
-    st.caption("Multi-Agent RAG & Validation System")
-
-st.markdown("---")
+        return {
+            "validated_answer": f"Based on verified internal records:\n\n{context}",
+            "confidence": "High (Verified against source chunks)"
+        }
 
 # Sidebar Navigation
-tabs = st.sidebar.radio("Navigation", ["Ask Vault", "Ingest Documents"])
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Ask Vault", "Ingest Documents"])
 
-if tabs == "Ask Vault":
-    st.subheader("Chat with Enterprise Knowledge Base")
-    query = st.text_input("Ask a question (e.g., What is our annual paid leave policy?):")
-    
-    if st.button("Send Query"):
-        if not query.strip():
-            st.warning("Please enter a query.")
-        else:
+if page == "Ask Vault":
+    st.title("🛡️ Enterprise Knowledge Vault")
+    st.caption("Multi-Agent RAG & Validation System")
+    st.markdown("---")
+
+    # Initialize chat history state
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {
+                "role": "assistant",
+                "content": "Hello! I am your Enterprise Multi-Agent RAG assistant. Ask me questions about company policies, HR guidelines, or ingested documents.",
+                "route": None,
+                "confidence": None,
+                "chunks": []
+            }
+        ]
+
+    # Render chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            if message["role"] == "assistant" and message.get("route"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"**Route Taken:** {message['route']}")
+                with col2:
+                    st.success(f"**Confidence:** {message['confidence']}")
+            
+            st.markdown(message["content"])
+            
+            if message.get("chunks"):
+                with st.expander(f"Retrieved Chunks ({len(message['chunks'])})"):
+                    for i, c in enumerate(message["chunks"], 1):
+                        st.markdown(f"📄 **{c['source']}** (Score: `{c['relevance_score']}`)")
+                        st.code(c["content"], language="text")
+
+    # Chat Input at bottom
+    if query := st.chat_input("Ask a question (e.g., What is our annual paid leave policy?)..."):
+        st.session_state.messages.append({"role": "user", "content": query, "route": None, "confidence": None, "chunks": []})
+        with st.chat_message("user"):
+            st.markdown(query)
+
+        with st.chat_message("assistant"):
             with st.spinner("Agents processing query..."):
                 route = AgentRouter.route_query(query)
                 chunks = similarity_search(query, k=2)
                 validation = ValidatorAgent.validate_response(chunks, query)
-            
+
             col1, col2 = st.columns(2)
             with col1:
                 st.info(f"**Route Taken:** {route}")
             with col2:
                 st.success(f"**Confidence:** {validation['confidence']}")
-            
-            st.markdown("### Answer")
-            st.markdown(f"> {validation['validated_answer']}")
-            
+
+            st.markdown(validation["validated_answer"])
+
             if chunks:
                 with st.expander(f"Retrieved Chunks ({len(chunks)})"):
                     for i, c in enumerate(chunks, 1):
-                        st.markdown(f"📄 **{c['source']}** (Score: `{c['relevance_score']}`)");
+                        st.markdown(f"📄 **{c['source']}** (Score: `{c['relevance_score']}`)")
                         st.code(c["content"], language="text")
 
-elif tabs == "Ingest Documents":
-    st.subheader("Ingest New Enterprise Document")
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": validation["validated_answer"],
+                "route": route,
+                "confidence": validation["confidence"],
+                "chunks": chunks
+            })
+
+elif page == "Ingest Documents":
+    st.title("📂 Ingest New Enterprise Document")
     st.caption("Add policy text and source names to update the vector knowledge base instantly.")
-    
+    st.markdown("---")
+
     doc_text = st.text_area("Document Text Content", height=150, placeholder="Paste company policy or guideline text here...")
     source_name = st.text_input("Source Name / Filename", placeholder="e.g., HR_Policy_2026.txt")
-    
+
     if st.button("Ingest into Vector Vault"):
         if not doc_text.strip() or not source_name.strip():
             st.error("Please provide both text content and a source name.")
